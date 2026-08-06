@@ -5,7 +5,7 @@ const viewLimiter = rateLimit.rateLimit({
   max: 1,
   keyGenerator: (req) => {
     const photoId = req.params.id || "default";
-    return `${req.ip}-${photoId}`;
+    return `${ipKeyGenerator(req.ip)}-${photoId}`;
   },
   handler: (req, res) => {
     res.status(200).json({ message: "OK" });
