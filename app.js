@@ -11,6 +11,7 @@ const SequelizeStore = require("connect-session-sequelize")(session.Store);
 const sessionStore = new SequelizeStore({ db: sequelize });
 
 const app = express();
+app.set("trust proxy", 1);
 
 app.use(cors({
   origin: process.env.CLIENT_URL,
@@ -27,6 +28,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
