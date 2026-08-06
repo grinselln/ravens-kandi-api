@@ -4,7 +4,7 @@ const { sequelize } = require("./database");
 const { QueryTypes } = require("sequelize");
 
 const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS
-  ? JSON.parse(process.env.ALLOWED_EMAILS)
+  ? process.env.ALLOWED_EMAILS.split(",")
   : [];
 
 passport.use(
