@@ -34,6 +34,7 @@ const processAndSaveImage = async (buffer, originalName) => {
   const outputPath = path.join(UPLOAD_DIR, filename);
 
   await sharp(buffer)
+    .rotate()
     .resize({ width: 1800, withoutEnlargement: true })
     .webp({ quality: 80 })
     .toFile(outputPath);
