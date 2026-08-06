@@ -279,7 +279,7 @@ async function validateCategorySelection(categoryList, subcategoryList, transact
   return null;
 }
 
-router.post("/", requireAdmin, upload.single("image"), async (req, res) => {
+router.post("/new", requireAdmin, upload.single("image"), async (req, res) => {
   const t = await sequelize.transaction();
   let filename = null;
 
