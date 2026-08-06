@@ -1,0 +1,10 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/ngrinsell/public_html/api.ravenskandi.com
+    - /bin/cp -R config $DEPLOYPATH
+    - /bin/cp -R middleware $DEPLOYPATH
+    - /bin/cp -R routes $DEPLOYPATH
+    - /bin/cp app.js $DEPLOYPATH
+    - /bin/cp package.json $DEPLOYPATH
+    - /bin/cp yarn.lock $DEPLOYPATH
