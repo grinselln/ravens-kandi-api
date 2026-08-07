@@ -2,6 +2,7 @@ const multer = require("multer");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
+const fsp = require("fs/promises");
 
 const UPLOAD_DIR = path.join(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
 const MAX_FILE_SIZE = (parseInt(process.env.MAX_FILE_SIZE_MB) || 10) * 1024 * 1024;
@@ -47,7 +48,7 @@ const deleteImageFile = async (filename) => {
   const filePath = path.join(UPLOAD_DIR, filename);
 
   try {
-    await fs.unlink(filePath);
+    await fsp.unlink(filePath);
   } catch (error) {
     if (error.code === "ENOENT") {
       // Already gone — not an error worth surfacing.

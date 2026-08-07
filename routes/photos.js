@@ -6,28 +6,31 @@ const { upload, processAndSaveImage, deleteImageFile } = require("../config/mult
 const { requireAdmin } = require("../middleware/requireAuth");
 const viewLimiter = require("../middleware/viewLimiter");
 
+const isProd = process.env.NODE_ENV === "development" ? 0 : 1;
 
 router.post("/", async (req, res) => {
   try {
     const { type, filters } = req.body;
+
     const replacements = [];
 
     let query = `
       SELECT p.*, pt.title as type_title
       FROM photos p
       LEFT JOIN photo_types pt ON p.photo_type_id = pt.id
+      WHERE p.isProd = ?
     `;
+    replacements.push(isProd);
     
 
     if (type) {
       const types = Array.isArray(type) ? type : [type];
-      query += ` WHERE p.photo_type_id IN (?)`;
+      query += ` AND p.photo_type_id IN (?)`;
       replacements.push(types);
     }
 
     for (const [idx, filter] of (filters ?? []).entries()) {
-      if (idx === 0 && type) query += ` AND`;
-      else if (idx === 0) query += ` WHERE`;
+      if (idx === 0) query += ` AND`;
 
       const hasSubcategories = filter.subcategory_ids.length > 0;
 
@@ -42,9 +45,9 @@ router.post("/", async (req, res) => {
 
       if (idx !== filters.length - 1) query += ` AND`
 
-      replacements.push(filter.category_id,);
+      replacements.push(filter.category_id);
 
-      hasSubcategories && replacements.push(filter.subcategory_ids);;
+      hasSubcategories && replacements.push(filter.subcategory_ids);
     };
 
     query += " ORDER BY p.created_at DESC";
@@ -68,7 +71,7 @@ router.post("/", async (req, res) => {
         NULL AS subcategory_order_index
       FROM photo_categories pc
       JOIN categories c ON c.id = pc.category_id
-      WHERE pc.photo_id IN (?)
+      ${photoIds.length > 0 ? `WHERE pc.photo_id IN (?)` : ``}
 
       UNION ALL
 
@@ -83,12 +86,12 @@ router.post("/", async (req, res) => {
       FROM photo_subcategories ps
       JOIN subcategories s ON s.id = ps.subcategory_id
       JOIN categories c ON c.id = s.category_id
-      WHERE ps.photo_id IN (?)
+      ${photoIds.length > 0 ? `WHERE ps.photo_id IN (?)` : ``}
 
       ORDER BY category_order_index ASC, subcategory_order_index ASC
       `,
       {
-        replacements: [photoIds, photoIds],
+        replacements: photoIds.length > 0 ? [photoIds, photoIds]: [],
         type: QueryTypes.SELECT,
       }
     );
@@ -141,17 +144,18 @@ router.post("/admin", async (req, res) => {
         CASE WHEN NOT EXISTS (SELECT 1 FROM photo_subcategories ps WHERE ps.photo_id = p.id) THEN true ELSE false END AS missing_subcategory
       FROM photos p
       LEFT JOIN photo_types pt ON p.photo_type_id = pt.id
+      WHERE p.isProd = ?
     `;
+    replacements.push(isProd);
     
     if (type) {
       const types = Array.isArray(type) ? type : [type];
-      query += `WHERE p.photo_type_id IN (?)`;
+      query += ` AND p.photo_type_id IN (?)`;
       replacements.push(types);
     }
 
     for (const [idx, filter] of (filters ?? []).entries()) {
-      if (idx === 0 && type) query += ` AND`;
-      else if (idx === 0) query += ` WHERE`;
+      if (idx === 0) query += ` AND`;
 
       const hasSubcategories = filter.subcategory_ids.length > 0;
 
@@ -160,8 +164,8 @@ router.post("/admin", async (req, res) => {
         FROM photo_subcategories ps
         JOIN subcategories s ON s.id = ps.subcategory_id
         WHERE ps.photo_id = p.id
-          AND s.category_id = ?
-          ${hasSubcategories ? `AND ps.subcategory_id IN (?)` : ``}
+        AND s.category_id = ?
+        ${hasSubcategories ? `AND ps.subcategory_id IN (?)` : ``}
       )`;
 
       if (idx !== filters.length - 1) query += ` AND`
@@ -307,9 +311,9 @@ router.post("/new", requireAdmin, upload.single("image"), async (req, res) => {
     filename = await processAndSaveImage(req.file.buffer, req.file.originalname);
 
     const [photoId] = await sequelize.query(
-      "INSERT INTO photos (photo_type_id, photo_filename, title, story, source, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
+      "INSERT INTO photos (photo_type_id, photo_filename, title, story, source, created_by, created_at, updated_at, isProd) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)",
       {
-        replacements: [photo_type_id || null, filename, title, story, source, req.user.id],
+        replacements: [photo_type_id || null, filename, title, story, source, req.user.id, isProd],
         type: QueryTypes.INSERT,
         transaction: t,
       }

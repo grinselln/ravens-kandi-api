@@ -4,20 +4,22 @@ const { sequelize } = require("../config/database");
 const { QueryTypes } = require("sequelize");
 const { requireAdmin } = require("../middleware/requireAuth");
 
+const isProd = process.env.NODE_ENV === "development" ? 0 : 1;
+
 router.get("/", async (req, res) => {
   try {
     const categories = await sequelize.query(
       `SELECT 
       c.*,
-      EXISTS(SELECT 1 FROM photo_categories pc WHERE pc.category_id = c.id) AS category_has_photo,
+      EXISTS(SELECT 1 FROM photo_categories pc JOIN photos p ON p.id = pc.photo_id WHERE pc.category_id = c.id AND p.isProd = ?) AS category_has_photo,
       sc.id as subcategory_id, 
       sc.title as subcategory_title, 
       sc.order_index as subcategory_order,
-      EXISTS(SELECT 1 FROM photo_subcategories ps WHERE ps.subcategory_id = sc.id) AS subcategory_has_photo
+      EXISTS(SELECT 1 FROM photo_subcategories ps JOIN photos p ON p.id = ps.photo_id WHERE ps.subcategory_id = sc.id AND p.isProd = ?) AS subcategory_has_photo
       FROM categories c
       LEFT JOIN subcategories sc ON sc.category_id = c.id
       ORDER BY c.order_index ASC, sc.order_index ASC`,
-      { type: QueryTypes.SELECT }
+      { replacements: [isProd, isProd], type: QueryTypes.SELECT }
     );
 
     const grouped = new Map();
