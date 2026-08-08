@@ -19,7 +19,7 @@ router.get("/google", (req, res, next) => {
 });
 
 router.get("/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login?error=authentication" }),
+  passport.authenticate("google", { failureRedirect: process.env.CLIENT_URL + "/login?error=authentication" }),
   (req, res) => {
     if (req.query.state === "popup") {
       return res.send(`
