@@ -181,7 +181,7 @@ router.post("/admin", async (req, res) => {
     if (missingSubcategory) missingConditions.push("NOT EXISTS (SELECT 1 FROM photo_subcategories ps WHERE ps.photo_id = p.id)");
 
     if (missingConditions.length) {
-      query += ` ${(type || filters) ? `AND` : `WHERE`} (${missingConditions.join(" OR ")})`;
+      query += ` AND (${missingConditions.join(" OR ")})`;
     }
 
     switch (sort) {
