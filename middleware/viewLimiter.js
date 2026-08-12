@@ -1,4 +1,4 @@
-const rateLimit = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
 const viewLimiter = rateLimit.rateLimit({
   windowMs: 5 * 60 * 1000, //5 minutes
