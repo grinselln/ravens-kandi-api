@@ -36,7 +36,7 @@ router.get("/", async (req, res) => {
           subcategories: [],
         });
       }
-
+      
       if (row.category_has_photo && !groupedOnlyPhotos.has(row.id)) {
         groupedOnlyPhotos.set(row.id, {
           id: row.id,
@@ -56,14 +56,13 @@ router.get("/", async (req, res) => {
         });
       }
 
-      if(row.subcategory_id && row.subcategory_has_photo) {
+      if(row.subcategory_id && row.subcategory_has_photo && groupedOnlyPhotos.get(row.id)) {   
         groupedOnlyPhotos.get(row.id).subcategories.push({
           id: row.subcategory_id,
           title: row.subcategory_title,
           order_index: row.subcategory_order
         });
       }
-
     }
 
     const groupedCategories = Array.from(grouped.values());
