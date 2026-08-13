@@ -13,9 +13,17 @@ const sessionStore = new SequelizeStore({ db: sequelize });
 const app = express();
 app.set("trust proxy", 1);
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim());
+
 app.use(cors({
-  origin: process.env.CLIENT_URL,
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
 }));
 
 app.use(express.json());
