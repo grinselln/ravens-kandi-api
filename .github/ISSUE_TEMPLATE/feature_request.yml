@@ -1,0 +1,28 @@
+name: Feature Request
+description: A new capability or enhancement
+title: "[Feature]: "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What's missing or painful right now? Why does this matter?
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: Rough idea of how you'd tackle this — doesn't need to be final
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / open questions
+      description: Unresolved decisions, dependencies on other issues, things to figure out along the way
+    validations:
+      required: false

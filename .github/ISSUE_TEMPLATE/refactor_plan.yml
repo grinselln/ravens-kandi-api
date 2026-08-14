@@ -1,0 +1,29 @@
+
+name: Refactor Plan
+description: Functionality optimization and organization
+title: "[Refactor]: "
+labels: ["refactor"]
+body:
+  - type: textarea
+    id: opportunity
+    attributes:
+      label: Opportunity
+      description: What's showing the possibilty for improvement?
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: Rough idea of how you'd tackle this — doesn't need to be final
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / open questions
+      description: Unresolved decisions, dependencies on other issues, things to figure out along the way
+    validations:
+      required: false
