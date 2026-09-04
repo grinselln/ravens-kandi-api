@@ -379,6 +379,7 @@ router.put("/:id", requireAdmin, upload.single("image"), async (req, res) => {
     }
 
     let filename = existing.photo_filename;
+
     if (req.file) {
       newFilename = await processAndSaveImage(req.file.buffer, req.file.originalname);
       filename = newFilename;

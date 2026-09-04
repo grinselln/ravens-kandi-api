@@ -134,12 +134,12 @@ router.get("/photoCategories", async (req, res) => {
 });
 
 router.post("/", requireAdmin, async (req, res) => {
-  const { title, subcategoryIds = [], newSubcategoryTitles = [], triggerSubcategoryId } = req.body;
+  const { title, subcategoryIds = [], newSubcategoryTitles = [], trigger_subcategory_id } = req.body;
 
   const t = await sequelize.transaction();
 
   try {
-    if (triggerSubcategoryId && subcategoryIds.includes(triggerSubcategoryId)) {
+    if (trigger_subcategory_id && subcategoryIds.includes(trigger_subcategory_id)) {
       await t.rollback();
       return res.status(400).json({ message: "Trigger subcategory can't belong to the category it triggers." });
     }
@@ -152,7 +152,7 @@ router.post("/", requireAdmin, async (req, res) => {
     const [categoryId] = await sequelize.query(
       `INSERT INTO categories (title, order_index, trigger_subcategory_id) VALUES (?, ?, ?)`,
       {
-        replacements: [title, maxOrder + 1, triggerSubcategoryId || null],
+        replacements: [title, maxOrder + 1, trigger_subcategory_id || null],
         type: QueryTypes.INSERT,
         transaction: t,
       }
@@ -218,7 +218,7 @@ router.post("/reorder", requireAdmin, async(req, res) => {
 
 router.put("/:id", requireAdmin, async (req, res) => {
   try {
-    const { title, order, triggerSubcategoryId, views } = req.body;
+    const { title, trigger_subcategory_id } = req.body;
 
     const [existing] = await sequelize.query(
       "SELECT * FROM categories WHERE id = ? LIMIT 1",
@@ -227,10 +227,10 @@ router.put("/:id", requireAdmin, async (req, res) => {
 
     if (!existing) return res.status(404).json({ message: "Category not found." });
 
-    if (triggerSubcategoryId) {
+    if (trigger_subcategory_id) {
       const [triggerSub] = await sequelize.query(
         "SELECT category_id FROM subcategories WHERE id = ? LIMIT 1",
-        { replacements: [triggerSubcategoryId], type: QueryTypes.SELECT }
+        { replacements: [trigger_subcategory_id], type: QueryTypes.SELECT }
       );
 
       if (triggerSub && triggerSub.category_id === parseInt(req.params.id)) {
@@ -238,12 +238,10 @@ router.put("/:id", requireAdmin, async (req, res) => {
       }
     }
 
-    const updatedViews = existing.views + (views ?? 0);
-
     await sequelize.query(
-      "UPDATE categories SET title = ?, views = ?, order_index = ?, trigger_subcategory_id = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE categories SET title = ?, trigger_subcategory_id = ?, updated_at = NOW() WHERE id = ?",
       {
-        replacements: [title, updatedViews, order ?? null, triggerSubcategoryId || null, req.params.id],
+        replacements: [title, trigger_subcategory_id || null, req.params.id],
         type: QueryTypes.UPDATE,
       }
     );
@@ -293,6 +291,20 @@ router.delete("/:id", requireAdmin, async (req, res) => {
     await sequelize.query("DELETE FROM categories WHERE id = ?",
       { replacements: [req.params.id], type: QueryTypes.DELETE, transaction: t }
     );
+
+    const categoryIds = await sequelize.query(
+      "SELECT id FROM categories WHERE order_index <> -1 ORDER BY order_index ASC",
+      { type: QueryTypes.SELECT, transaction: t }
+    );
+
+    for (let i = 0; i < categoryIds.length; i++) {
+      const { id } = categoryIds[i];
+
+      await sequelize.query(
+        "UPDATE categories SET order_index = ?, updated_at = NOW() WHERE id = ?",
+        { replacements: [i, id], type: QueryTypes.UPDATE, transaction: t }
+      );
+    }
 
     await t.commit();
     res.json({ message: "Category deleted successfully." });
