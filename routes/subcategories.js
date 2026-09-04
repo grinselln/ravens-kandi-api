@@ -198,7 +198,7 @@ router.post("/bulk", requireAdmin, async (req, res) => {
 
 router.put("/:id", requireAdmin, async (req, res) => {
   try {
-    const { category, title, views, order } = req.body;
+    const { category_id, title, order } = req.body;
 
     const [existing] = await sequelize.query(
       "SELECT * FROM subcategories WHERE id = ? LIMIT 1",
@@ -207,16 +207,16 @@ router.put("/:id", requireAdmin, async (req, res) => {
 
     if (!existing) return res.status(404).json({ message: "Subcategory not found." });
 
-    const categoryChanged = category !== existing.category_id;
+    const categoryChanged = category_id !== existing.category_id;
 
     // guard: can't reassign this subcategory into the category it triggers
-    if (categoryChanged && category) {
+    if (categoryChanged && category_id) {
       const [triggeredCategory] = await sequelize.query(
         "SELECT id FROM categories WHERE trigger_subcategory_id = ? LIMIT 1",
         { replacements: [req.params.id], type: QueryTypes.SELECT }
       );
 
-      if (triggeredCategory && triggeredCategory.id === category) {
+      if (triggeredCategory && triggeredCategory.id === category_id) {
         return res.status(400).json({ message: "This subcategory can't be assigned to the category it triggers." });
       }
     }
@@ -226,18 +226,16 @@ router.put("/:id", requireAdmin, async (req, res) => {
     if (categoryChanged) {
       const [{ maxOrder }] = await sequelize.query(
         "SELECT COALESCE(MAX(order_index), -1) as maxOrder FROM subcategories WHERE category_id " +
-        (category ? "= ?" : "IS NULL"),
-        { replacements: category ? [category] : [], type: QueryTypes.SELECT }
+        (category_id ? "= ?" : "IS NULL"),
+        { replacements: category_id ? [category_id] : [], type: QueryTypes.SELECT }
       );
       finalOrder = maxOrder + 1;
     }
 
-    const updatedViews = existing.views + (views ?? 0);
-
     await sequelize.query(
-      "UPDATE subcategories SET category_id = ?, title = ?, views = ?, order_index = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE subcategories SET category_id = ?, title = ?, order_index = ?, updated_at = NOW() WHERE id = ?",
       {
-        replacements: [category ?? null, title, updatedViews, finalOrder, req.params.id],
+        replacements: [category_id ?? null, title, finalOrder, req.params.id],
         type: QueryTypes.UPDATE,
       }
     );
@@ -282,6 +280,20 @@ router.delete("/:id", requireAdmin, async (req, res) => {
     await sequelize.query("DELETE FROM subcategories WHERE id = ?",
       { replacements: [req.params.id], type: QueryTypes.DELETE, transaction: t }
     );
+
+    const subcategoryIds = await sequelize.query(
+      "SELECT id FROM subcategories WHERE category_id = ? ORDER BY order_index ASC",
+      { replacements: [existing.category_id], type: QueryTypes.SELECT, transaction: t }
+    );
+
+    for (let i = 0; i < subcategoryIds.length; i++) {
+      const { id } = subcategoryIds[i];
+
+      await sequelize.query(
+        "UPDATE subcategories SET order_index = ?, updated_at = NOW() WHERE id = ?",
+        { replacements: [i, id], type: QueryTypes.UPDATE, transaction: t }
+      );
+    }
 
     await t.commit();
     res.json({ message: "Subcategory deleted successfully." });
