@@ -134,7 +134,7 @@ router.post("/", async (req, res) => {
 
 router.post("/admin", async (req, res) => {
   try {
-    const { type, filters, missingType, missingCategory, missingSubcategory, sort } = req.body;
+    const { type, filters, missingType, missingCategory, missingSubcategory, sort, count } = req.body;
     const replacements = [];
 
     let query = `
@@ -175,13 +175,13 @@ router.post("/admin", async (req, res) => {
       hasSubcategories && replacements.push(filter.subcategory_ids);;
     };
 
-    const missingConditions = [];
-    if (missingType) missingConditions.push("p.photo_type_id IS NULL");
-    if (missingCategory) missingConditions.push("NOT EXISTS (SELECT 1 FROM photo_categories pc WHERE pc.photo_id = p.id)");
-    if (missingSubcategory) missingConditions.push("NOT EXISTS (SELECT 1 FROM photo_subcategories ps WHERE ps.photo_id = p.id)");
+    const checkedConditions = [];
+    if (missingType) checkedConditions.push("p.photo_type_id IS NULL");
+    if (missingCategory) checkedConditions.push("NOT EXISTS (SELECT 1 FROM photo_categories pc WHERE pc.photo_id = p.id)");
+    if (missingSubcategory) checkedConditions.push("NOT EXISTS (SELECT 1 FROM photo_subcategories ps WHERE ps.photo_id = p.id)");
 
-    if (missingConditions.length) {
-      query += ` AND (${missingConditions.join(" OR ")})`;
+    if (checkedConditions.length) {
+      query += ` AND (${checkedConditions.join(" OR ")})`;
     }
 
     switch (sort) {
@@ -196,6 +196,11 @@ router.post("/admin", async (req, res) => {
         break;
       default:
         query += " ORDER BY p.created_at DESC";
+    }
+
+    if (count) {
+      query += ` LIMIT ?`;
+      replacements.push(count);
     }
 
     const photos = await sequelize.query(query, {
@@ -288,7 +293,7 @@ router.post("/new", requireAdmin, upload.single("image"), async (req, res) => {
   let filename = null;
 
   try {
-    const { title, story, source, photo_type_id, categories, subcategories } = req.body;
+    const { title, story, source, photo_type_id, categories, subcategories, inventory } = req.body;
 
     if (!req.file) {
       await t.rollback();
@@ -310,10 +315,20 @@ router.post("/new", requireAdmin, upload.single("image"), async (req, res) => {
 
     filename = await processAndSaveImage(req.file.buffer, req.file.originalname);
 
+    const inventoryObj = JSON.parse(inventory);
+
     const [photoId] = await sequelize.query(
-      "INSERT INTO photos (photo_type_id, photo_filename, title, story, source, created_by, created_at, updated_at, isProd) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)",
+      `INSERT INTO photos (
+        photo_type_id, photo_filename, title, story, source, created_by, 
+        created_at, updated_at, isProd,
+        created_count, given_count, hidden_count, marked_count, taken_count, discard_count 
+      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?)`,
       {
-        replacements: [photo_type_id || null, filename, title, story, source, req.user.id, isProd],
+        replacements: [
+          photo_type_id || null, filename, title, story, source, req.user.id, isProd,
+          inventoryObj.created_count, inventoryObj.given_count, inventoryObj.hidden_count,
+          inventoryObj.marked_count, inventoryObj.taken_count, inventoryObj.discard_count,
+        ],
         type: QueryTypes.INSERT,
         transaction: t,
       }
@@ -353,7 +368,7 @@ router.put("/:id", requireAdmin, upload.single("image"), async (req, res) => {
   let oldFilenameToDelete = null;
 
   try {
-    const { title, story, source, photo_type_id, categories, subcategories } = req.body;
+    const { title, story, source, photo_type_id, categories, subcategories, inventory } = req.body;
 
     const [existing] = await sequelize.query(
       "SELECT * FROM photos WHERE id = ? LIMIT 1",
@@ -386,10 +401,20 @@ router.put("/:id", requireAdmin, upload.single("image"), async (req, res) => {
       oldFilenameToDelete = existing.photo_filename;
     }
 
+    const inventoryObj = inventory ? JSON.parse(inventory) : null;
+
     await sequelize.query(
-      "UPDATE photos SET photo_type_id = ?, photo_filename = ?, title = ?, story = ?, source = ?, updated_at = NOW() WHERE id = ?",
+      `UPDATE photos SET 
+        photo_type_id = ?, photo_filename = ?, title = ?, story = ?, source = ?,
+        created_count = ?, given_count = ?, hidden_count = ?, marked_count = ?, taken_count = ?, discard_count = ?, 
+        updated_at = NOW() WHERE id = ?`,
       {
-        replacements: [photo_type_id, filename, title, story || null, source || null, req.params.id],
+        replacements: [
+          photo_type_id, filename, title, story || null, source || null, 
+          inventoryObj?.created_count ?? existing.created_count, inventoryObj?.given_count ?? existing.given_count, inventoryObj?.hidden_count ?? existing.hidden_count,
+          inventoryObj?.marked_count ?? existing.marked_count, inventoryObj?.taken_count ?? existing.taken_count, inventoryObj?.discard_count ?? existing.discard_count,
+          req.params.id
+        ],
         type: QueryTypes.UPDATE,
         transaction: t,
       }
@@ -440,6 +465,47 @@ router.put("/:id", requireAdmin, upload.single("image"), async (req, res) => {
     }
     console.error(error);
     res.status(500).json({ message: "Failed to update photo." });
+  }
+});
+
+router.patch("/:id/quantities", requireAdmin, async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { created_count, given_count, hidden_count, marked_count, taken_count, discard_count } = req.body;
+
+    const [existing] = await sequelize.query(
+      "SELECT * FROM photos WHERE id = ? LIMIT 1",
+      { replacements: [req.params.id], type: QueryTypes.SELECT, transaction: t }
+    );
+
+    if (!existing) {
+      await t.rollback();
+      return res.status(404).json({ message: "Photo not found." });
+    }
+
+    await sequelize.query(
+      "UPDATE photos SET created_count = ?, given_count = ?, hidden_count = ?, marked_count = ?, taken_count = ?, discard_count = ?, updated_at = NOW() WHERE id = ?",
+      {
+        replacements: [created_count ?? existing.created_count, 
+          given_count ?? existing.given_count, 
+          hidden_count ?? existing.hidden_count,
+          marked_count ?? existing.marked_count,
+          taken_count ?? existing.taken_count,
+          discard_count ?? existing.discard_count, 
+          req.params.id],
+        type: QueryTypes.UPDATE,
+        transaction: t,
+      }
+    );
+
+    await t.commit();
+
+    res.json({ message: "Photo quantities updated successfully." });
+  } catch (error) {
+    await t.rollback();
+    console.error(error);
+    res.status(500).json({ message: "Failed to update photo quantities." });
   }
 });
 
