@@ -37,7 +37,7 @@ passport.use(
       await sequelize.query(
         "INSERT INTO users (id, username, role, created_at) VALUES (?, ?, ?, NOW())",
         {
-          replacements: [profile.id, profile.displayName, "admin"],
+         replacements: [profile.id, profile.displayName ?? email, "admin"],
           type: QueryTypes.INSERT,
         }
       );
