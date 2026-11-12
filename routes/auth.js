@@ -13,25 +13,32 @@ router.get("/me", (req, res) => {
 router.get("/google", (req, res, next) => {
   const state = req.query.popup === "true" ? "popup" : "normal";
   passport.authenticate("google", {
-    scope: ["profile", "email"],
+    scope: ["email"],
     state,
   })(req, res, next);
 });
 
-router.get("/google/callback",
-  passport.authenticate("google", { failureRedirect: process.env.CLIENT_URL + "/login?error=authentication" }),
-  (req, res) => {
-    if (req.query.state === "popup") {
-      return res.send(`
-        <script>
-          window.opener.postMessage('auth-success', '${process.env.CLIENT_URL}');
-          window.close();
-        </script>
-      `);
-    }
-    res.redirect(process.env.CLIENT_URL + "/admin");
-  }
-);
+router.get("/google/callback", (req, res, next) => {
+  passport.authenticate("google", (err, user, info) => {
+    if (err) return next(err);
+    if (!user) return res.redirect(process.env.CLIENT_URL + "/login?error=authentication");
+
+    req.logIn(user, (loginErr) => {
+      if (loginErr) return next(loginErr);
+
+      if (req.query.state === "popup") {
+        return res.send(`
+          <script>
+            window.opener.postMessage('auth-success', '${process.env.CLIENT_URL}');
+            window.close();
+          </script>
+        `);
+      }
+      
+      res.redirect(process.env.CLIENT_URL + "/admin");
+    });
+  })(req, res, next);
+});
 
 router.post("/logout", requireAdmin, (req, res) => {
   req.logout((err) => {
