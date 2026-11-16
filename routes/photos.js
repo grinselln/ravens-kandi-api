@@ -5,6 +5,7 @@ const { QueryTypes } = require("sequelize");
 const { upload, processAndSaveImage, deleteImageFile } = require("../config/multer");
 const { requireAdmin } = require("../middleware/requireAuth");
 const viewLimiter = require("../middleware/viewLimiter");
+const { withPhotoUrl } = require("../config/uploads.js");
 
 const isProd = process.env.NODE_ENV === "development" ? 0 : 1;
 
@@ -117,13 +118,12 @@ router.post("/", async (req, res) => {
       }
     }
 
-    const photosWithCategories = photos.map((photo) => {
-      return ({
+    const photosWithCategories = photos.map((photo) => withPhotoUrl({
       ...photo,
       categories: categoriesByPhoto[photo.id]
         ? Array.from(categoriesByPhoto[photo.id].values())
         : [],
-    })});
+    }));
 
     res.json(photosWithCategories);
   } catch (error) {
@@ -208,7 +208,7 @@ router.post("/admin", async (req, res) => {
       type: QueryTypes.SELECT,
     });
 
-    res.json(photos);
+    res.json(photos.map(withPhotoUrl))
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch photos." });
@@ -227,7 +227,7 @@ router.get("/:id", async (req, res) => {
 
     if (!photo) return res.status(404).json({ message: "Photo not found." });
 
-    res.json(photo);
+    res.json(withPhotoUrl(photo));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch photo." });
