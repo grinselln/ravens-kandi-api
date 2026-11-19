@@ -3,8 +3,12 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const { sequelize } = require("./database");
 const { QueryTypes } = require("sequelize");
 
-const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS
-  ? process.env.ALLOWED_EMAILS.split(",")
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS
+  ? process.env.ADMIN_EMAILS.split(",")
+  : [];
+
+const USER_EMAILS = process.env.USER_EMAILS
+  ? process.env.USER_EMAILS.split(",")
   : [];
 
 passport.use(
@@ -18,9 +22,11 @@ passport.use(
       try {
         const email = profile.emails?.[0]?.value?.toLowerCase();
 
-        if (!email || !ALLOWED_EMAILS.includes(email)) {
+        if (!email || (!ADMIN_EMAILS.includes(email) && !USER_EMAILS.includes(email))) {
           return done(null, false, { message: "Email not authorized." });
         }
+
+        const isAdmin = ADMIN_EMAILS.includes(email);
 
         const [existing] = await sequelize.query(
         "SELECT * FROM users WHERE id = ? LIMIT 1",
@@ -37,7 +43,7 @@ passport.use(
       await sequelize.query(
         "INSERT INTO users (id, username, role, created_at) VALUES (?, ?, ?, NOW())",
         {
-         replacements: [profile.id, profile.displayName ?? email, "admin"],
+         replacements: [profile.id, profile.displayName ?? "", isAdmin ? "admin" : "user"],
           type: QueryTypes.INSERT,
         }
       );
