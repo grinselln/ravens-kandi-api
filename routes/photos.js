@@ -473,7 +473,7 @@ router.patch("/:id/quantities", requireAdmin, async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    const { created_count, given_count, hidden_count, marked_count, taken_count, discard_count, needed_count, is_needed_priority } = req.body;
+    const { created_count, given_count, hidden_count, marked_count, taken_count, discard_count, needed_count, is_needed_priority, is_retired } = req.body;
 
     const [existing] = await sequelize.query(
       "SELECT * FROM photos WHERE id = ? LIMIT 1",
@@ -486,7 +486,7 @@ router.patch("/:id/quantities", requireAdmin, async (req, res) => {
     }
 
     await sequelize.query(
-      "UPDATE photos SET created_count = ?, given_count = ?, hidden_count = ?, marked_count = ?, taken_count = ?, discard_count = ?, needed_count = ?, is_needed_priority = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE photos SET created_count = ?, given_count = ?, hidden_count = ?, marked_count = ?, taken_count = ?, discard_count = ?, needed_count = ?, is_needed_priority = ?, is_retired = ?, updated_at = NOW() WHERE id = ?",
       {
         replacements: [created_count ?? existing.created_count, 
           given_count ?? existing.given_count, 
@@ -496,6 +496,7 @@ router.patch("/:id/quantities", requireAdmin, async (req, res) => {
           discard_count ?? existing.discard_count,
           needed_count ?? existing.needed_count,
           is_needed_priority ?? existing.is_needed_priority, 
+          is_retired ?? existing.is_retired,
           req.params.id],
         type: QueryTypes.UPDATE,
         transaction: t,
