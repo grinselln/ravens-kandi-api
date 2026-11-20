@@ -516,7 +516,7 @@ router.patch("/:id/quantities/user", requireAuth, async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    const { created_count, needed_count } = req.body;
+    const { created_count, needed_count, is_needed_priority } = req.body;
 
     const [existing] = await sequelize.query(
       "SELECT * FROM photos WHERE id = ? LIMIT 1",
@@ -529,10 +529,11 @@ router.patch("/:id/quantities/user", requireAuth, async (req, res) => {
     }
 
     await sequelize.query(
-      "UPDATE photos SET created_count = ?, needed_count = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE photos SET created_count = ?, needed_count = ?, is_needed_priority = ?, updated_at = NOW() WHERE id = ?",
       {
         replacements: [created_count ?? existing.created_count, 
           needed_count ?? existing.needed_count,
+          is_needed_priority ?? existing.is_needed_priority,
           req.params.id],
         type: QueryTypes.UPDATE,
         transaction: t,
